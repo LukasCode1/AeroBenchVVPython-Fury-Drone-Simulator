@@ -24,6 +24,7 @@ function directly.
 
 import numpy as np
 from aircraft import Vehicle, Autopilot
+from lethality import hazard_to_step_probability
 
 ROLE_ESCORT = "ESCORT"
 ROLE_DECOY = "DECOY"
@@ -130,30 +131,45 @@ def command_drone(drone, role, mothership, threat, index, n_drones):
     return Autopilot.fly_to_point(drone, slot, desired_speed=mothership.v)
 
 
-def jam_probability_fn(drones, roles, denial_radius=1200.0, base_jam_effect=0.35, decoy_pull_effect=0.5):
+def jam_probability_fn(drones, roles, dt, denial_radius=1200.0,
+                       jammer_rate_hz=8.6, decoy_rate_hz=13.9):
     """
     Builds the jam_prob_fn passed to GenericSAM.acquire(). Returns a function
-    of the candidate target that estimates probability of denying/redirecting
-    seeker lock this tick, based on live JAMMER/DECOY drones near the threat.
+    of the candidate target giving the probability that jamming or decoy pull
+    denies seeker lock during a step of length ``dt``.
 
-    This is a probabilistic abstraction of countermeasure effectiveness, not
-    a model of any real jamming waveform or seeker design.
+    Countermeasure effectiveness is specified as a HAZARD RATE (per second),
+    not as a per-tick probability. The earlier model applied a fixed ~0.35
+    probability every tick: at dt=0.05 that is 20 rolls per second, so lock was
+    denied within about a second regardless of geometry, and halving the
+    timestep silently halved the modeled effect. Rates make the result
+    invariant to dt -- see lethality.hazard_to_step_probability.
+
+    Concurrent jammers and decoys are competing risks, so their rates add and
+    the sum is converted to a probability once.
+
+    Default rates are the values that reproduce the legacy per-tick numbers at
+    the legacy dt=0.05 (-ln(1-0.35)/0.05 = 8.6 Hz, -ln(1-0.5)/0.05 = 13.9 Hz),
+    so behavior is unchanged at the original step size while becoming
+    step-invariant. They are placeholders pending real calibration, not
+    measurements of any jamming technique.
     """
     def fn(candidate_target, threat_pos):
-        p_deny = 0.0
+        total_rate = 0.0
         for d in drones:
             if not d.alive:
                 continue
             role = roles.get(d.name)
             if role == ROLE_JAMMER:
-                dist = np.linalg.norm(d.pos() - threat_pos)
-                if dist < denial_radius:
-                    effect = base_jam_effect * d.jam_power * (1 - dist / denial_radius)
-                    p_deny = 1 - (1 - p_deny) * (1 - effect)
+                radius = denial_radius
+                rate = jammer_rate_hz
             elif role == ROLE_DECOY:
-                dist = np.linalg.norm(d.pos() - threat_pos)
-                if dist < denial_radius * 1.5:
-                    effect = decoy_pull_effect * d.jam_power * (1 - dist / (denial_radius * 1.5))
-                    p_deny = 1 - (1 - p_deny) * (1 - effect)
-        return p_deny
+                radius = denial_radius * 1.5
+                rate = decoy_rate_hz
+            else:
+                continue
+            dist = np.linalg.norm(d.pos() - threat_pos)
+            if dist < radius:
+                total_rate += rate * d.jam_power * (1 - dist / radius)
+        return hazard_to_step_probability(total_rate, dt)
     return fn

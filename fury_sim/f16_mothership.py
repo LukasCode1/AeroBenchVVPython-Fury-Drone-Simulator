@@ -126,6 +126,42 @@ class F16Mothership:
     def pos(self):
         return np.array([self.x, self.y, self.z])
 
+    def velocity_vector(self):
+        """World-frame velocity (m/s) as [vx_north, vy_east, vz_up].
+
+        Body-axis components are rotated into the navigation frame with the
+        same direction cosine matrix AeroBenchVV's own equations of motion use
+        for the POSN/POSE/ALT derivatives (see the "navigation" block in
+        `aerobench/lowlevel/subf16_model.py`), so this is exactly the velocity
+        the integrator is propagating -- not an approximation of it.
+        """
+        s = self._state
+        vt = s[StateIndex.VEL]
+        alpha, beta = s[StateIndex.ALPHA], s[StateIndex.BETA]
+        phi, theta, psi = s[StateIndex.PHI], s[StateIndex.THETA], s[StateIndex.PSI]
+
+        cbta = np.cos(beta)
+        u = vt * np.cos(alpha) * cbta
+        v = vt * np.sin(beta)
+        w = vt * np.sin(alpha) * cbta
+
+        sth, cth = np.sin(theta), np.cos(theta)
+        sph, cph = np.sin(phi), np.cos(phi)
+        spsi, cpsi = np.sin(psi), np.cos(psi)
+
+        t1, t2, t3 = sph * cpsi, cph * sth, sph * spsi
+        s1, s2 = cth * cpsi, cth * spsi
+        s3, s4 = t1 * sth - cph * spsi, t3 * sth + cph * cpsi
+        s5 = sph * cth
+        s6, s7 = t2 * cpsi + t3, t2 * spsi - t1
+        s8 = cph * cth
+
+        v_north = u * s1 + v * s3 + w * s6
+        v_east = u * s2 + v * s4 + w * s7
+        v_up = u * sth - v * s5 - w * s8   # AeroBenchVV's xd[11] is altitude rate
+
+        return np.array([v_north, v_east, v_up]) * FT_TO_M
+
     def step(self, dt, *_ignored_autopilot_cmds):
         """Advance the F-16 by dt seconds.
 
