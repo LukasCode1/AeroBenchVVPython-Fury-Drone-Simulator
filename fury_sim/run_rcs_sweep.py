@@ -158,6 +158,45 @@ def plot_crossover(df):
     plt.close(fig)
 
 
+def plot_detection_physics():
+    """The fourth-root law, with recognisable objects on it.
+
+    One curve, one colour: this figure has a single job, which is to show why
+    low observability is bought in decibels and paid for in fourth roots.
+    """
+    viz_style.apply()
+    radar = SearchRadar()
+    grid = np.logspace(-4, 2.2, 300)
+    ranges = np.array([radar.detection_range(s) for s in grid]) / 1000
+
+    fig, ax = plt.subplots(figsize=(8.0, 4.6))
+    ax.plot(grid, ranges, color=viz_style.SERIES[0], lw=2.2, zorder=2)
+
+    for label, rcs in sorted(RCS_REFERENCE.items(), key=lambda kv: kv[1]):
+        r = radar.detection_range(rcs) / 1000
+        ax.plot([rcs], [r], "o", color=viz_style.SERIES[0], markersize=7,
+                markeredgecolor=viz_style.SURFACE, markeredgewidth=2, zorder=3)
+        # Labels sit below the curve where there is room, and flip above near
+        # the bottom of the axes so they never run into the x-axis.
+        low = r < 0.18 * (ranges.max() * 1.12)
+        ax.annotate(f"{label}\n{r:.0f} km", (rcs, r), textcoords="offset points",
+                    xytext=(9, 4 if low else -4), fontsize=8.5,
+                    color=viz_style.INK_SECONDARY, va="bottom" if low else "top")
+
+    ax.set_xscale("log")
+    ax.set_xlabel("Radar cross section (m$^2$)")
+    ax.set_ylabel("Detection range (km)")
+    ax.set_title("Detection range scales as the fourth root of RCS\n"
+                 "a 10 dB signature reduction buys 44% less detection range, not 90%",
+                 fontsize=12)
+    ax.set_xlim(grid[0], grid[-1] * 3)
+    ax.set_ylim(0, ranges.max() * 1.12)
+
+    fig.tight_layout()
+    fig.savefig("output/detection_range_vs_rcs.png", bbox_inches="tight")
+    plt.close(fig)
+
+
 def report(df):
     print(f"Manned aircraft RCS {MANNED_RCS} m^2, escort {ESCORT_CROSS_TRACK/1000:.0f} km abeam, "
           f"release at {RELEASE_RANGE/1000:.0f} km, {N_TRIALS} trials per point.\n")
@@ -184,4 +223,5 @@ if __name__ == "__main__":
     df.to_csv("output/rcs_sweep_results.csv", index=False)
     report(df)
     plot_crossover(df)
+    plot_detection_physics()
     print("\nDone. See output/rcs_crossover.png")
