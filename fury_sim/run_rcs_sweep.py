@@ -46,8 +46,14 @@ ESCORT_CROSS_TRACK = 8000.0  # abeam separation (m)
 RELEASE_RANGE = 30_000.0     # how far in the manned aircraft has to get
 
 
-def survival(escort_rcs, magazine, n=N_TRIALS, tag=0):
-    """Fraction of trials in which the manned aircraft reaches its release point."""
+def survival(escort_rcs, magazine, n=None, tag=0):
+    """Fraction of trials in which the manned aircraft reaches its release point.
+
+    ``n`` resolves against the module global at call time rather than being
+    bound as a default at import, so a caller (or a smoke test) can shrink the
+    sweep without editing the source.
+    """
+    n = N_TRIALS if n is None else n
     battery = SamBattery(magazine=magazine)
     wins = 0
     for i in range(n):
@@ -60,7 +66,8 @@ def survival(escort_rcs, magazine, n=N_TRIALS, tag=0):
     return wins
 
 
-def shots_at_manned(escort_rcs, magazine, n=N_TRIALS, tag=0):
+def shots_at_manned(escort_rcs, magazine, n=None, tag=0):
+    n = N_TRIALS if n is None else n
     battery = SamBattery(magazine=magazine)
     total = 0
     for i in range(n):

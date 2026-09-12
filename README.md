@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.9%2B-2a78d6" alt="Python 3.9+">
-  <img src="https://img.shields.io/badge/tests-31-2a78d6" alt="31 tests">
+  <a href="https://github.com/LukasCode1/AeroBenchVVPython-Fury-Drone-Simulator/actions/workflows/tests.yml"><img src="https://github.com/LukasCode1/AeroBenchVVPython-Fury-Drone-Simulator/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-2a78d6" alt="Python 3.11, 3.12, 3.13">
   <img src="https://img.shields.io/badge/flight%20model-AeroBenchVV%20F--16-1baf7a" alt="AeroBenchVV F-16">
   <img src="https://img.shields.io/badge/license-GPL--3.0-898781" alt="GPL-3.0">
 </p>
@@ -223,15 +223,21 @@ defensive manoeuvre is close to worthless.
 ## Running it
 
 ```bash
+pip install -r requirements.txt
+
 cd fury_sim
-python -m pytest tests/ -q      # 31 verification and regression tests, ~27 s
+python -m pytest tests/ -q      # 34 verification and regression tests, ~30 s
 python run_rcs_sweep.py         # the crossover study, ~1 min
 python run_experiment.py        # the swarm study, ~1 min
 python animate_engagement.py    # renders one engagement as a 3D GIF
 ```
 
-Requires `numpy`, `scipy`, `matplotlib`, `pandas`, `pytest` and `Pillow`. No install step is needed
-for the F-16 model — `f16_mothership.py` puts `code/` on `sys.path` at import time.
+Python 3.11 or newer. No install step is needed for the F-16 model —
+`f16_mothership.py` puts `code/` on `sys.path` at import time.
+
+CI runs the test suite on 3.11, 3.12 and 3.13, and separately regenerates **both studies from a
+clean checkout** and publishes the results as a build artifact — so every figure and table above is
+checkable rather than taken on trust.
 
 Every trial draws from its own independent random stream addressed by `[MASTER_SEED, ...]`, so
 sweeps reproduce exactly, any single trial can be re-derived in isolation for debugging, and adding

@@ -1,0 +1,11 @@
+# Runtime and test dependencies for the escort drone employment study.
+#
+# Floors reflect what the code is actually verified against rather than the
+# oldest version that might work. numpy 2.x, pandas 2.x and scipy 1.11+ all
+# require Python 3.11, which is the real floor for this project.
+numpy>=1.26
+scipy>=1.11
+matplotlib>=3.8
+pandas>=2.0
+pillow>=10.0
+pytest>=7.4

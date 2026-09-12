@@ -212,14 +212,17 @@ absorption benefit without the alerting cost, and the result would move.
 | `run_rcs_sweep.py` | Study B harness and the crossover figure |
 | `animate_engagement.py` | Renders one engagement as an animated 3D GIF |
 | `viz_style.py` | Shared chart palette and chrome |
-| `tests/` | 31 unit and end-to-end regression tests |
+| `tests/` | 34 unit, integration and end-to-end regression tests |
+| `../requirements.txt` | Dependency floors, shared with CI (repository root) |
 | `VALIDATION.md` | Verification and validation evidence |
 
 ## 9. Running it
 
 ```
+pip install -r ../requirements.txt
+
 cd fury_sim
-python -m pytest tests/ -q      # 31 tests, ~27 s
+python -m pytest tests/ -q      # 34 tests, ~30 s
 python run_experiment.py        # Study A sweep, ~1 min
 python run_rcs_sweep.py         # Study B sweep, ~1 min
 python animate_engagement.py    # renders one engagement as a 3D GIF
