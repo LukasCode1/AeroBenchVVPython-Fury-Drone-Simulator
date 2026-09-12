@@ -167,7 +167,40 @@ non-manoeuvring target:
 N′ = 2 converges an order of magnitude more slowly than N′ ≥ 3, as theory
 predicts. Reference: Zarchan, *Tactical and Strategic Missile Guidance*.
 
-### 3.3 Lethality calibration
+### 3.3 Radar range equation and detection statistics
+
+Detection range must scale as the fourth root of RCS, which is the reason low
+observability is expensive: it takes a 10,000-fold RCS reduction to cut
+detection range by a factor of ten.
+
+| Check | Expected | Result |
+|---|---|---|
+| 10× RCS | 10^0.25 = 1.7783× range | 1.7783 |
+| 10 dB RCS reduction | ~44% range reduction | 43.8% |
+| Pd at the reference range | 0.5 per scan by construction | exact to 1e-9 |
+| Pd monotonic in range and in RCS | strictly | pass |
+
+The resulting detection ranges against open published RCS values land where a
+long-range search radar's should:
+
+| Target class | Notional RCS | Detection range |
+|---|---|---|
+| large aircraft | 100 m² | 474 km |
+| fighter | 5 m² | 224 km |
+| cruise missile | 0.5 m² | 126 km |
+| small UAS | 0.05 m² | 71 km |
+| stealth aircraft | 0.005 m² | 40 km |
+
+Single-scan detection probability is the closed-form Swerling Case 1 result,
+`Pd = Pfa^(1/(1+SNR))`, which is exact for a slowly fluctuating Rayleigh target
+rather than an approximation fitted to one.
+
+A separate test covers a state-leak defect class rather than a physics one: the
+battery carries magazine and refire state, so `run_ingress` copies a
+caller-supplied instance. Without that, a sweep depletes one shared magazine
+partway through and every later trial silently reports an unopposed ingress.
+
+### 3.4 Lethality calibration
 
 With miss distance driven to ~0 by §3.2, realized kill rate must equal `pk_max`.
 Over 120 unopposed shots: **0.892 measured against 0.900 expected** (0.3 standard

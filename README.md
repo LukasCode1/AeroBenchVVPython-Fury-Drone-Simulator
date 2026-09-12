@@ -78,6 +78,34 @@ step rather than by sampling range at step boundaries. That distinction
 decides every number above; the evidence, including the defect it replaced,
 is in [`fury_sim/VALIDATION.md`](fury_sim/VALIDATION.md).
 
+## Does the escort give the formation away?
+
+The table above only covers what happens once a missile is already in the air.
+The more common objection to manned-unmanned teaming is upstream of that: a
+drone with a larger radar cross section is seen further out, and seeing it
+tells the defender where to look. A second, mission-level study sweeps escort
+RCS against defender magazine depth.
+
+![RCS crossover](fury_sim/output/rcs_crossover.png)
+
+| Defender magazine | Unescorted survival | Effect of adding an escort |
+|---|---|---|
+| 1 missile | 0.47 | **helps**, up to +53 points, above 0.035 m² |
+| 2 missiles | 0.38 | **hurts** at every tested RCS, worst −27 points |
+| 4 missiles | 0.42 | **hurts**, worst −42 points |
+| 8 missiles | 0.43 | **hurts**, worst −43 points |
+
+The sign is set by the defender's magazine, not by the escort. With one
+missile available it goes to the drone and the manned aircraft walks. With two
+or more, alerting the defender early costs more than the drone absorbs. The
+worst design point is an escort with roughly the same signature as the
+aircraft it escorts — visible enough to start the defender's clock, not
+attractive enough to draw the shot.
+
+Detection range scales as the fourth root of RCS, so this is not a small
+effect to engineer around: a 10 dB signature reduction buys 44% less detection
+range, not 90%.
+
 ![Sample trajectory](fury_sim/output/sample_trajectory.png)
 ![Survival vs swarm size](fury_sim/output/survival_vs_swarm_size.png)
 
