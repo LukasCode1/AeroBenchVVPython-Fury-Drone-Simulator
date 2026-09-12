@@ -33,8 +33,6 @@ Produces:
     output/sample_trajectory.png     one illustrative 3-drone engagement
 """
 
-import math
-
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -43,40 +41,13 @@ import matplotlib.pyplot as plt
 
 import viz_style
 from engagement import run_engagement
+from mcstats import wilson_interval, required_trials
 
 N_TRIALS_PER_CONFIG = 60
 SWARM_SIZES = [0, 1, 2, 3, 4, 6, 8]
 SAM_RANGE = 20000.0
 MASTER_SEED = 20260912
 OFFSET_LIMIT_DEG = 25.0
-
-
-# --------------------------------------------------------------------- stats
-
-def wilson_interval(successes, n, z=1.96):
-    """95% Wilson score interval for a binomial proportion.
-
-    Preferred over the normal approximation, which misbehaves badly for
-    proportions near 0 or 1 -- exactly where survival rates live.
-    """
-    if n == 0:
-        return (float("nan"), float("nan"))
-    p = successes / n
-    denom = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return (max(0.0, centre - half), min(1.0, centre + half))
-
-
-def required_trials(p1, p2, alpha=0.05, power=0.80):
-    """Trials per arm needed to resolve a change from p1 to p2."""
-    from statistics import NormalDist
-    z_a = NormalDist().inv_cdf(1 - alpha / 2)
-    z_b = NormalDist().inv_cdf(power)
-    pbar = (p1 + p2) / 2
-    num = (z_a * math.sqrt(2 * pbar * (1 - pbar))
-           + z_b * math.sqrt(p1 * (1 - p1) + p2 * (1 - p2))) ** 2
-    return math.ceil(num / (p2 - p1) ** 2)
 
 
 # ------------------------------------------------------------------ sweeping
