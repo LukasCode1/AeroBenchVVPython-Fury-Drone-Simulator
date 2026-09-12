@@ -70,15 +70,25 @@ def determine_outcome(mothership, drones, sam):
     end with the SAM marker converging on the mothership/drone cluster.
     '''
 
+    miss = sam.miss_distance
+
     if not mothership.alive:
         return "OUTCOME: Mothership HIT -- destroyed", "mothership"
 
     dead_drones = [d.name for d in drones if not d.alive]
     if dead_drones:
-        return f"OUTCOME: {', '.join(dead_drones)} HIT by SAM -- mothership safe", dead_drones[0]
+        return (f"OUTCOME: {', '.join(dead_drones)} destroyed by SAM burst "
+                f"-- mothership safe"), dead_drones[0]
 
-    if sam.detonated or not sam.alive:
-        return "OUTCOME: SAM neutralized (intercepted) -- no casualties", None
+    # The SAM detonating is no longer the same thing as the SAM being defeated:
+    # the warhead is expended on any close pass, and the damage roll can fail.
+    if sam.outcome == "miss":
+        detail = f" at {miss:.0f} m" if miss is not None else ""
+        return (f"OUTCOME: SAM warhead expended{detail}, no kill "
+                f"-- mothership safe"), None
+
+    if sam.outcome == "energy_exhausted":
+        return "OUTCOME: SAM ran out of energy -- mothership safe", None
 
     return "OUTCOME: engagement timed out, SAM never resolved -- mothership safe", None
 

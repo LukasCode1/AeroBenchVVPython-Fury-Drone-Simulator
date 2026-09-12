@@ -1,173 +1,211 @@
-# Fury Style Escort Swarm Engagement Simulation
+# Escort swarm survivability study
 
-A simulation testbed for studying whether an autonomous escort drone swarm
-improves the survivability of a manned strike aircraft against a single
-surface to air missile shot, and how that effect scales with swarm size and
-role allocation. The manned aircraft (the "mothership") is flown with
-AeroBenchVV's actual nonlinear F 16 flight dynamics model, so the ingress
-trajectory this study is built on is the same six degree of freedom aircraft
-model used elsewhere in this repository, not a simplified stand in.
+A Monte Carlo testbed for a single question: does an autonomous escort drone
+swarm improve the survivability of a manned strike aircraft against a
+surface-to-air missile shot, and what does that protection cost in drones?
 
-## Research question
+The manned aircraft (the "mothership") is flown with AeroBenchVV's actual
+nonlinear F-16 flight dynamics model, so the ingress trajectory is the same
+six-degree-of-freedom aircraft model used elsewhere in this repository, not a
+simplified stand-in.
 
-Given a fixed missile threat and a fixed ingress profile, does adding escort
-drones in defined roles (decoy, jammer, hard kill interceptor) change the
-probability that the mothership survives, and is there a point of
-diminishing or negative returns as swarm size grows?
+Structured as a study plan: purpose, scope, assumptions, measures of
+effectiveness, method, results, limitations.
 
-## Animated example
+---
+
+## 1. Purpose of study
+
+Quantify the change in mothership survival probability produced by adding
+escort drones in defined roles (decoy, jammer, hard-kill interceptor) against a
+fixed missile threat and a fixed ingress profile, and identify the point of
+diminishing returns as swarm size grows.
+
+## 2. Scope and limitations
+
+**In scope:** one manned aircraft, one SAM shot, 0-8 escort drones, a single
+ingress geometry, engagement-level physics.
+
+**Out of scope, and therefore not claimed:** detection and radar cross-section
+effects, multi-shot salvos, adversary decision-making, basing and sortie
+generation, operator workload, and cost. The survival numbers below say nothing
+about whether an escort drone is *worth buying* — that requires a cost-exchange
+metric this study does not yet compute.
+
+No model here represents the seeker, airframe, warhead, or guidance parameters
+of any real system. The guidance law and aerodynamic model are published
+textbook material; all seeker, warhead and countermeasure parameters are
+generic and uncalibrated.
+
+## 3. Critical assumptions
+
+| # | Assumption | Why it matters |
+|---|---|---|
+| A1 | The mothership flies straight and level and never defends | Removes the single most effective real countermeasure. Survival numbers are a lower bound. |
+| A2 | Drones have perfect knowledge of missile position and velocity | No detection, tracking, or cueing latency is modeled, so intercept performance is an upper bound. |
+| A3 | One SAM per engagement | No magazine depth, no saturation, no re-attack. |
+| A4 | Missile flies at constant speed, no drag or motor burn | Bounded only by a hard flight-time limit. |
+| A5 | Countermeasure effectiveness is a hazard rate, not a modeled waveform | Rates are placeholders chosen to reproduce prior behavior, not measurements. |
+
+A1 and A2 are the two that most affect the headline result. Both are stated
+again alongside the finding.
+
+## 4. Measures of effectiveness
+
+| MOE | Definition |
+|---|---|
+| Mothership survival rate | Fraction of trials in which the mothership is not destroyed, with a 95% Wilson score interval |
+| Escort attrition | Mean drones lost per engagement |
+| Miss distance | Closest point of approach between missile and whatever it bursts against |
+| Shot resolution | Whether the SAM killed, burst without killing, or ran out of energy |
+
+## 5. Method
+
+| Entity | Dynamics model | Fidelity |
+|---|---|---|
+| Mothership | AeroBenchVV 13-state nonlinear F-16, LQR inner loop, waypoint outer loop | Full nonlinear ODE, `scipy.integrate.RK45` |
+| Escort drones | Energy-state / bank-to-turn point mass | Reduced order, closed-form update |
+| SAM | Proportional navigation (Zarchan), generic seeker with FOV, range and hazard-rate lock denial | Reduced order, textbook guidance law |
+
+The mothership gets the higher-fidelity treatment deliberately: the study is
+about the survivability of that one aircraft. Drones and missile use
+reduced-order models so thousands of trials stay tractable (~0.1-0.25 s per
+trial).
+
+**Hit/miss is resolved by solving for closest approach inside each integration
+step**, not by sampling range at step boundaries. That distinction decides every
+number in this document — see [`VALIDATION.md`](VALIDATION.md) §1.
+
+**Sampling:** 60 trials per swarm size; SAM launched from 20 km at an offset
+drawn uniformly from ±25° off nose-on. Every trial draws from its own
+independent random stream addressed by `[MASTER_SEED, n_drones, trial]`, so the
+sweep is reproducible, individual trials are reproducible in isolation, and
+adding a configuration does not perturb existing ones.
+
+## 6. Results
+
+| Escort drones | Survival rate | 95% CI | Mean drones lost | Mean miss distance |
+|---|---|---|---|---|
+| 0 | 0.13 | [0.07, 0.24] | 0.00 | 0.00 m |
+| 1 | 1.00 | [0.94, 1.00] | 0.67 | 6.29 m |
+| 2 | 1.00 | [0.94, 1.00] | 0.65 | 6.35 m |
+| 3 | 1.00 | [0.94, 1.00] | 0.82 | 6.60 m |
+| 4 | 1.00 | [0.94, 1.00] | 0.78 | 6.59 m |
+| 6 | 1.00 | [0.94, 1.00] | 0.63 | 6.80 m |
+| 8 | 1.00 | [0.94, 1.00] | 0.77 | 6.63 m |
+
+![Survival vs swarm size](output/survival_vs_swarm_size.png)
+![How the shot resolved](output/sam_outcomes.png)
+![Sample trajectory](output/sample_trajectory.png)
+
+One engagement, rendered by `animate_engagement.py`. The escort drone flies onto
+the missile's collision triangle, forces the warhead to be expended 4 km short of
+the mothership, and is destroyed by the burst. The mothership survives.
 
 ![Engagement animation](engagement_anim3d.gif)
 
-The clip above is produced by `animate_engagement.py`. Black marker and
-trail: the mothership. Colored markers: escort drones. Red triangle: the
-inbound SAM. The default scenario ends with the drone closing to intercept
-range and neutralizing the missile before it reaches the mothership; the
-text overlay in the final frames states the actual outcome explicitly
-(see "Reading the animation" below for why that label is necessary).
+### Findings
 
-## Model summary
+**F1 — Unescorted, the aircraft dies.** A perfectly guided PN missile against a
+non-manoeuvring F-16 achieves essentially zero miss distance, and the 13%
+survival rate is exactly the complement of the modeled warhead lethality
+(Pk_max = 0.9). This is the baseline the escort has to beat.
 
-| Entity          | Dynamics model                                                   | Fidelity |
-|------------------|-------------------------------------------------------------------|----------|
-| Mothership       | AeroBenchVV 13 state nonlinear F 16 model, LQR inner loop, waypoint outer loop autopilot | Full nonlinear ODE, integrated with `scipy.integrate.RK45` |
-| Escort drones    | Energy state / bank to turn point mass model (turn rate from bank angle and speed, climb rate from flight path angle, first order roll and speed lag) | Reduced order, closed form update |
-| SAM              | Proportional navigation guidance (Zarchan, *Tactical and Strategic Missile Guidance*), generic seeker with field of view, range, and lock/jam probability | Reduced order, textbook guidance law |
+**F2 — One interceptor is sufficient, and more add nothing.** Survival goes to
+1.00 with a single escort drone and stays there. The effect is large enough to
+resolve with 4 trials per arm; the remaining seven configurations are
+indistinguishable from each other. Under this threat, the marginal value of the
+second through eighth drone is zero.
 
-The mothership gets the higher fidelity treatment deliberately: this study
-is about the survivability of that one aircraft, so its trajectory should
-come from the same validated nonlinear model used for verification work
-elsewhere in this repository. The drones and the missile use reduced order
-models so that thousands of Monte Carlo trials remain computationally
-tractable.
+**F3 — Protection is paid for in drones.** Mean attrition is 0.63-0.82 drones
+per engagement across every non-zero swarm size — the interceptor forces the
+warhead to be expended and is inside the burst when it happens. Miss distance
+settles near 6.5 m, where the damage function gives roughly a 76% chance of
+killing the drone. The exchange is one drone, most of the time, for one manned
+aircraft.
 
-None of these models represent the seeker, airframe, or guidance parameters
-of any specific real world system. The SAM guidance law and aerodynamic
-model are both standard, publicly published textbook material.
+**F4 — Soft kill did almost nothing here.** Jammers and decoys denied seeker
+lock on under 2% of ticks, and denial rarely changed an outcome. The reason is
+A1: against a target holding a constant course, a missile that loses lock coasts
+along a heading that is already a collision course. Electronic attack without a
+defensive manoeuvre is close to worthless, which is consistent with how the two
+are employed together in practice.
 
-## Repository layout
+### What these numbers are not
 
-| File                     | Role |
-|--------------------------|------|
-| `f16_mothership.py`      | Wraps `code/aerobench` (AeroBenchVV) as the mothership. Converts between this project's meters and AeroBenchVV's feet, and exposes position, heading, and velocity in the form the rest of the simulation expects. |
-| `aircraft.py`            | Reduced order `Vehicle` flight model, used only for the escort drones. |
-| `swarm.py`               | `Drone` class and swarm role logic: escort, decoy, jammer, interceptor. Role assignment is a pluggable policy function. |
-| `missile.py`             | `GenericSAM`: proportional navigation guidance, seeker acquisition, and a probabilistic countermeasure denial model. |
-| `engagement.py`          | `run_engagement()`: ties one mothership, one swarm, and one SAM together into a single timestepped run and returns outcome statistics. |
-| `run_experiment.py`      | Monte Carlo harness. Sweeps swarm size, aggregates survival statistics, and writes CSVs and summary plots. |
-| `animate_engagement.py`  | Renders one engagement as an animated 3D GIF, with an explicit outcome label (see below). |
+F2's "1.00 survival" is an upper bound produced by A2 — the interceptor is
+perfectly cued. Insert any realistic detection, track and cueing delay and the
+interceptor's achievable closest approach grows, at which point the 30 m fuze
+radius stops being a certainty. **The right reading of F2 is that hard-kill
+body-block is geometrically feasible in this scenario, not that it is reliable.**
 
-## Requirements
+## 7. Repository layout
 
-Python 3 with `numpy`, `scipy`, `matplotlib`, `pandas`, and `Pillow`. No
-separate install step is needed for the AeroBenchVV dependency:
-`f16_mothership.py` adds `code/` (relative to this directory) to `sys.path`
-at import time.
+| File | Role |
+|---|---|
+| `lethality.py` | Closest-approach solver, damage function, hazard-rate conversion |
+| `f16_mothership.py` | Wraps `code/aerobench` as the mothership; metres/feet conversion at the boundary |
+| `aircraft.py` | Reduced-order `Vehicle` model and autopilot, used for escort drones |
+| `swarm.py` | `Drone` and swarm role logic: escort, decoy, jammer, interceptor. Role policy is pluggable |
+| `missile.py` | `GenericSAM`: PN guidance, seeker acquisition, proximity fuze, damage roll |
+| `engagement.py` | `run_engagement()`: one mothership, one swarm, one SAM, one outcome |
+| `run_experiment.py` | Monte Carlo harness, Wilson intervals, summary plots |
+| `animate_engagement.py` | Renders one engagement as an animated 3D GIF |
+| `viz_style.py` | Shared chart palette and chrome |
+| `tests/` | Unit and end-to-end regression tests |
+| `VALIDATION.md` | Verification and validation evidence |
 
-## Running the Monte Carlo experiment
-
-```
-cd fury_sim
-python run_experiment.py
-```
-
-This runs 60 trials at each of several swarm sizes (0, 1, 2, 3, 4, 6, and 8
-drones), with the SAM launched from 20 km at a random offset angle each
-trial. It writes `output/experiment_results.csv` (one row per trial),
-`output/experiment_summary.csv` (aggregated by swarm size), and two plots.
-
-The script prints nothing until the full sweep finishes. Because the
-mothership is now a genuine nonlinear ODE simulation rather than a closed
-form update, a full sweep (420 trials) takes a few minutes on a typical
-laptop; this is expected, not a hang.
-
-### Sample results
-
-From a 60 trial per swarm size run against a SAM launched at 20 km, offset
-uniformly between -25 and +25 degrees off nose on:
-
-| Escort drones | Survival rate | Mean miss distance (m) |
-|---------------|---------------|--------------------------|
-| 0             | 0.82          | 31.6 |
-| 1             | 0.85          | 28.4 |
-| 2             | 0.72          | 27.3 |
-| 3             | 0.82          | 63.0 |
-| 4             | 0.82          | 64.3 |
-| 6             | 0.83          | 61.0 |
-| 8             | 0.93          | 75.7 |
-
-No drone was lost in any trial in this run. These numbers will vary between
-runs since trial seeds are not fixed in the sweep; treat this table as
-illustrative of the kind of output the harness produces, not as a final
-result.
-
-![Sample trajectory](output/sample_trajectory.png)
-![Survival vs swarm size](output/survival_vs_swarm_size.png)
-
-## Rendering a 3D engagement animation
+## 8. Running it
 
 ```
 cd fury_sim
-python animate_engagement.py
+python -m pytest tests/ -q      # 18 tests, ~25 s
+python run_experiment.py        # Monte Carlo sweep, ~1 min
+python animate_engagement.py    # renders one engagement as a 3D GIF
 ```
 
-Produces `engagement_anim3d.gif`. Useful options:
+Requires `numpy`, `scipy`, `matplotlib`, `pandas`, `pytest` and `Pillow`. No
+separate install step for the AeroBenchVV dependency: `f16_mothership.py` adds
+`code/` to `sys.path` at import time.
+
+### Animation options
 
 | Flag | Meaning | Default |
-|------|---------|---------|
+|---|---|---|
 | `--n-drones` | escort swarm size | 1 |
 | `--seed` | trial seed | 1 |
-| `--sam-offset-deg` | SAM launch angle off nose on | 0 |
-| `--max-frames` | rendered frame budget (lower renders faster) | 200 |
-| `--hold-seconds` | how long the final frame freezes before the loop restarts | 2.5 |
+| `--sam-offset-deg` | SAM launch angle off nose-on | 0 |
+| `--max-frames` | rendered frame budget | 200 |
+| `--hold-seconds` | final-frame freeze before the loop restarts | 2.5 |
 | `--elev`, `--azim` | 3D camera angle | 25, -60 |
 | `--fps` | playback frame rate | 20 |
 
-The default `n_drones=1, seed=1` scenario was chosen because it actually
-resolves, with the drone reaching intercept range and neutralizing the SAM
-around t=30s. With three or more escort drones, the SAM frequently loses
-lock under sustained jamming and decoy pressure and coasts, unresolved, for
-the rest of the 90 second engagement window. That is a real property of the
-current SAM model, not a rendering bug, but it produces a far less
-legible animation, so it was not used as the default.
+At this simulation's scale an intercepted SAM and a hit on the mothership look
+nearly identical — both end with the SAM marker converging on the same cluster.
+The animation therefore states the outcome in text rather than leaving it to
+marker proximity, and marks whatever was actually destroyed with a red X.
 
-## Reading the animation
+## 9. Known limitations
 
-At the scale of this simulation, the SAM closes over tens of kilometers
-while the escort formation holds a spacing of only a few hundred meters.
-That means an intercepted SAM and an actual hit on the mothership look
-almost identical: both end with the SAM marker converging on the same small
-cluster of aircraft markers. `animate_engagement.py` resolves this
-ambiguity directly rather than leaving it to marker proximity. Once an
-engagement ends, it checks which entity, if any, actually has its `alive`
-flag cleared and prints and overlays one of:
+Beyond the assumptions in §3:
 
-- `Mothership HIT, destroyed`
-- `<drone name> HIT by SAM, mothership safe`
-- `SAM neutralized (intercepted), no casualties`
-- `engagement timed out, SAM never resolved, mothership safe`
+- **Miss distance has no spread.** With perfect seeker information, no guidance
+  lag and a non-manoeuvring target, PN produces a near-zero miss every time, so
+  the damage function always evaluates at its maximum against the mothership.
+  Seeker noise, target manoeuvre and guidance lag generate real miss-distance
+  distributions and none are modeled.
+- **No detection model.** Nothing in this study depends on radar cross-section,
+  which means it cannot address whether an escort drone makes the formation
+  easier to find — the question that motivates most current scepticism about
+  manned-unmanned teaming.
+- **No cost model.** F3 describes an exchange in units of aircraft, not dollars.
+- **Countermeasure rates are placeholders**, and soft-kill effectiveness is
+  therefore not a result this study can defend.
+- **Escort drones use a reduced-order flight model**, so their manoeuvring
+  limits are approximate and not derived from a specific airframe.
 
-whichever entity was actually destroyed is marked with a red X for the
-remaining frames.
+## 10. Attribution
 
-## Known modeling limitations
-
-- The SAM's countermeasure denial model (decoy pull, jamming) is a tunable
-  probability function, not a model of a real seeker, waveform, or IR
-  signature.
-- An interceptor drone that body blocks the SAM destroys it at no modeled
-  cost to the drone itself. This is a deliberate simplification, not an
-  oversight.
-- Once the SAM's seeker loses lock, it coasts ballistically on its last
-  known heading and keeps attempting reacquisition, but in practice rarely
-  succeeds once the geometry has diverged. Survival statistics for larger
-  swarm sizes should be read with this in mind: many of those trials end in
-  an unresolved time out rather than a defeated missile.
-- The escort drones use a reduced order flight model, so their maneuvering
-  limits are approximate, not derived from a specific airframe.
-
-## Attribution
-
-This project is built on top of AeroBenchVV, the F 16 verification
-benchmark in the rest of this repository. See the top level `README.md` and
-`LICENSE` for citation information and license terms.
+Built on top of AeroBenchVV, the F-16 verification benchmark in the rest of this
+repository. See the top-level `README.md` and `LICENSE` for citation information
+and license terms.

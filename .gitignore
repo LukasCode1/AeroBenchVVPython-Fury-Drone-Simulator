@@ -12,3 +12,7 @@ TAGS
 *.mypy_cache
 __pycache__
 *.pkl
+# This project publishes its own result figures and animation in the README,
+# so they are exempt from the blanket *.png / *.gif rules above.
+!fury_sim/output/*.png
+!fury_sim/engagement_anim3d.gif

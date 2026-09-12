@@ -11,11 +11,15 @@ relies on is not a simplified stand in.
 ![Engagement animation](fury_sim/engagement_anim3d.gif)
 
 Black marker and trail: the mothership. Colored markers: escort drones. Red
-triangle: the inbound SAM. In the clip above, the escort drone closes to
-intercept range and neutralizes the missile before it reaches the
-mothership. The text overlay in the final frames states the actual outcome
-explicitly, since at this simulation's scale an intercepted SAM and an
-actual hit on the mothership can otherwise look nearly identical.
+triangle: the inbound SAM. In the clip above the escort drone flies onto the
+missile's collision triangle and forces the warhead to be expended 4 km short
+of the mothership — and is destroyed by the burst doing it. The mothership
+survives. That trade, one drone for one manned aircraft, is the result this
+study exists to quantify.
+
+The text overlay in the final frames states the outcome explicitly, since at
+this simulation's scale an intercept and a hit on the mothership otherwise
+look nearly identical; whatever was actually destroyed is marked with a red X.
 
 ## Research question
 
@@ -39,24 +43,40 @@ described below, rather than a simplified approximation. None of these
 models represent the seeker, airframe, or guidance parameters of any
 specific real world system.
 
-## Sample results
+## Results
 
 From a 60 trial per swarm size Monte Carlo sweep, SAM launched at 20 km,
-offset uniformly between -25 and +25 degrees off nose on:
+offset uniformly between -25 and +25 degrees off nose on. Every trial draws
+from its own reproducible random stream, so this table regenerates exactly.
 
-| Escort drones | Survival rate | Mean miss distance (m) |
-|---------------|---------------|--------------------------|
-| 0             | 0.82          | 31.6 |
-| 1             | 0.85          | 28.4 |
-| 2             | 0.72          | 27.3 |
-| 3             | 0.82          | 63.0 |
-| 4             | 0.82          | 64.3 |
-| 6             | 0.83          | 61.0 |
-| 8             | 0.93          | 75.7 |
+| Escort drones | Survival rate | 95% CI | Mean drones lost |
+|---------------|---------------|--------------|------------------|
+| 0             | 0.13          | [0.07, 0.24] | 0.00 |
+| 1             | 1.00          | [0.94, 1.00] | 0.67 |
+| 2             | 1.00          | [0.94, 1.00] | 0.65 |
+| 3             | 1.00          | [0.94, 1.00] | 0.82 |
+| 4             | 1.00          | [0.94, 1.00] | 0.78 |
+| 6             | 1.00          | [0.94, 1.00] | 0.63 |
+| 8             | 1.00          | [0.94, 1.00] | 0.77 |
 
-These numbers vary between runs since trial seeds are not fixed in the
-sweep; treat this table as illustrative of the kind of output the harness
-produces, not as a final result.
+Three findings, stated with the assumptions that bound them:
+
+- **Unescorted, the aircraft dies.** A perfectly guided missile against a
+  non-manoeuvring F-16 achieves essentially zero miss distance; 13% survival
+  is exactly the complement of the modeled warhead lethality.
+- **One interceptor is sufficient and more add nothing.** Survival goes to
+  1.00 with a single escort and stays there — the marginal value of the
+  second through eighth drone is zero under this threat. This is an upper
+  bound: the interceptor is perfectly cued, with no detection or tracking
+  delay modeled.
+- **Protection is paid for in drones.** Mean attrition is 0.63-0.82 drones per
+  engagement. The interceptor forces the warhead to be expended and is inside
+  the burst when it happens.
+
+Hit/miss is resolved by solving for closest approach within each integration
+step rather than by sampling range at step boundaries. That distinction
+decides every number above; the evidence, including the defect it replaced,
+is in [`fury_sim/VALIDATION.md`](fury_sim/VALIDATION.md).
 
 ![Sample trajectory](fury_sim/output/sample_trajectory.png)
 ![Survival vs swarm size](fury_sim/output/survival_vs_swarm_size.png)
@@ -65,11 +85,12 @@ produces, not as a final result.
 
 ```
 cd fury_sim
+python -m pytest tests/ -q       # 18 verification/regression tests
 python run_experiment.py         # Monte Carlo sweep across swarm sizes
 python animate_engagement.py     # renders one engagement as a 3D GIF
 ```
 
-Both scripts depend only on `numpy`, `scipy`, `matplotlib`, `pandas`, and
+These depend only on `numpy`, `scipy`, `matplotlib`, `pandas`, `pytest` and
 `Pillow`. No separate install step is needed for the underlying F 16 model:
 the mothership wrapper adds `code/` to `sys.path` at import time.
 
